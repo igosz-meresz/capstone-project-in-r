@@ -1,0 +1,283 @@
+Data Analysis Capstone Project changelog & progress. 
+
+--19.07.2021, 14:47
+in VSCode Studio created a file "bellabeat-case-study-fitbeat.r" and wrote the following commands:
+
+setwd("C:\\Users\\igorr\\Documents\\LEARNING\\Google Data Analytics Coursera\\Keggle_datasets\\capstone-project-bellabeat\\Fitabase Data 4.12.16-5.12.16")
+install.packages("tidyverse")
+library("tidyverse")
+install.packages("ggplot2")
+library("ggplot2")
+install.packages("here")
+library("here")
+install.packages("skimr")
+library("skimr")
+install.packages("janitor")
+library("janitor")
+install.packages("dplyr")
+library("dplyr")
+
+This should set up the correct environment to process and further clean the datasets if neccessary. 
+
+--19.07.2021, 15:18
+in VSCS adding the following lines to establish shortcuts for quicker data exploration and cleaning.
+
+dailyActivity<-read.csv("dailyActivity_merged.csv")
+dailyCalories<-read.csv("dailyCalories_merged.csv")
+dailyIntensities<-read.csv("dailyIntensities_merged.csv")
+dailySteps<-read.csv("dailySteps_merged.csv")
+hourlySteps<-read.csv("hourlySteps_merged.csv")
+heartrate<-read.csv("heartrate_seconds_merged.csv")
+hourlyCalories<-read.csv("hourlyCalories_merged.csv")
+hourlyIntensities<-read.csv("hourlyIntensities_merged.csv")
+minuteCalories<-read.csv("minuteCaloriesWide_merged.csv")
+minuteIntensities<-read.csv("minuteIntensitiesWide_merged.csv")
+minuteMETs<-read.csv("minuteMETsNarrow_merged.csv")
+minuteSleep<-read.csv("minuteSleep_merged.csv")
+minuteSteps<-read.csv("minuteStepsWide_merged.csv")
+sleepDay<-read.csv("sleepDay_merged.csv")
+weight<-read.csv("weightLogInfo_merged.csv")
+
+--19.07.2021, 15:57
+Using the View(dataset) function to explore the datasets
+
+View(dailyActivity)
+View(dailyIntensities)
+View(heartrate)
+View(hourlyIntensities)
+View(minuteCalories)
+View(minuteMETs)
+View(minuteSteps)
+View(weight)
+View(dailyCalories)
+View(dailySteps)
+View(hourlyCalories)
+View(hourlySteps)
+View(minuteIntensities)
+View(minuteSleep)
+View(sleepDay)
+
+--19.07.2021, 18:15
+Figured out how to sort and save sorted dataframes as new dataframes: 
+*dataset_name* %>%
+arrange(*column_name*) <--!-- sorting
+
+*new_dataset_name* <- *dataset_name %>% arrange(*column_name*)
+
+View(*new_dataset_name*)
+
+--20.07.2021, 14:32
+What are the business objectives? 
+
+--20.07.2021, 14:45
+Decided that there are 3 main .cvs files - "dailyActivity", "sleepDay" & "weight"
+I'm going to focus on them first. 
+
+--20.07.2021, 14:54
+in "sleepDay" and "weight" date and time are in the same column. It's neccessary to separate them for readability.
+
+sleepDay_edit<-sleepDay%>%
+  separate(SleepDay,c("Date","Time")," ")
+
+--20.07.2021, 15:00
+Combining "dailyAcitivity" and "sleepDay" datasets.
+
+combined_sleep<-full_join(dailyActivity,sleepDay_edit,by = c("Id"="Id","ActivityDate" = "Date"))
+
+see if it worked:
+glimpse(combined_sleep)
+summary(combined_sleep)
+
+>It does!:)
+
+--20.07.2021, 15:22
+Need to get rid of missing values. Instead of removing them I'll use leftjoin() command. 
+
+only_sleep<-left_join(sleepDay_edit,dailyActivity,by=c("Id"="Id","Date" = "ActivityDate"))
+
+glimpse(only_sleep)
+
+--20.07.2021, 15:36
+Creating new columns to distinguish sleep hours and non-sleep hours. 
+
+only_sleep$nonSleep_hrs = (only_sleep$SedentaryMinutes+only_sleep$LightlyActiveMinutes+only_sleep$FairlyActiveMinutes+only_sleep$VeryActiveMinutes)/60
+
+only_sleep$total = only_sleep$nonSleep_hrs + (only_sleep$TotalMinutesAsleep/60)
+
+only_sleep
+
+20.07.2021, 15:43
+Some hours in "total" column are greater than 24 which is wrong. Removing the wrong data.
+
+20.07.2021, 15:46
+The dataset is now clean :) Proceeding to analyze it. 
+
+20.07.2021, 15:47
+To simplify things, let's assume that I'll split users into two categories, based on their activity:
+1. Heavy User
+2. Light User
+
+People with more than 1 hour are "active" and "very active" are Heavy User.
+Others are "Light User".
+
+only_sleep_clean$heavy_mins = only_sleep_clean$FairlyActiveMinutes+only_sleep_clean$VeryActiveMinutes
+
+only_sleep_clean$lite_mins = only_sleep_clean$SedentaryMinutes+only_sleep_clean$LightlyActiveMinutes+only_sleep_clean$TotalMinutesAsleep
+
+only_sleep_clean$type = case_when(only_sleep_clean$heavy_mins > 60 ~ "Heavy User", TRUE ~ "Light User")
+
+see if it worked:
+
+only_sleep_clean
+
+it does :) 
+
+20.07.2021, 15:53
+Entering the visualization phase:
+
+loading ggplot for dataviz
+library(ggplot2)
+
+creating fist visualization:
+ggplot(only_sleep_clean,aes(x=type,fill=type))+geom_bar()
+
+conclusion: Most users are light users. 
+
+20.07.2021, 15:58
+Investigating the amount of calories burned by both Heavy and Light users.
+
+ggplot(only_sleep_clean,aes(x=type,y=Calories,fill=type))+geom_boxplot(alpha=.2)+theme(legend.position = "none")+labs(title = 'Calories burned by type')
+
+conclusion: Unsurprisingly, Heavy Users burn more calories than Light Users. Heavy users burn between 1800 and 3600 balories, whereas Light Users burn between 1700 and 2500 cals. Most people in the sample are Light Users. 
+
+20.07.2021, 16:05
+
+Plotting histogram for calories burned:
+
+only_sleep_clean %>%
+  summarise(Id, Calories, type) %>%
+  ggplot(aes(Calories,fill=type)) + geom_histogram(bins=50)
+
+only_sleep_clean %>%
+  summarise(Id, Calories, type) %>%
+  ggplot(aes(Calories)) + geom_histogram(aes(fill=..count..),bins=50)
+
+conclusion: Most of sample population burns around 2000 cals. 
+
+20.07.2021, 16:11
+Investigating relationship between distance traveled by Users and Calories burned:
+
+ggplot(only_sleep_clean,aes(x=TotalDistance,y=Calories)) +geom_jitter() +geom_smooth()
+
+conclusion: Unsurprisingly, as total distance increases calories burned also increase. However, it is not linear so I assume Users not only burn calories by travelling on foot but also by other means. 
+
+20.07.2021, 16:24
+Plotting TotalSteps registered by Users:
+
+only_sleep_clean %>%
+  summarise(Id, TotalSteps, type) %>%
+  ggplot(aes(TotalSteps,fill=type)) + geom_histogram(bins=30)
+
+conclusion: below 10k steps it's mostly Light Users, above 10k - Heavy Users. 
+
+--20.07.2021, 16:29
+Plotting the distance most Users travel:
+
+ggplot(only_sleep_clean,aes(TotalDistance))+geom_histogram(binwidth = 5,color='black',fill='tomato',size=1,alpha=.4)+facet_wrap(~type)
+
+Conclusion: Most Users travel a distance between 10 and 15.
+
+--20.07.2021, 16:32
+Plotting people based on their number of steps vs. Calories burned. 
+
+only_sleep_clean %>% 
+  summarise(step_cat = factor(case_when(TotalSteps < 4000 ~ 'Less than 4k',
+                                        TotalSteps >=4000 & TotalSteps<8000 ~ '4k to 8k',
+                                        TotalSteps >=8000 & TotalSteps<11000 ~ '8k to 11k',
+                                        TotalSteps >= 11000 ~ 'Greater than 11k'),levels = c('Less than 4k','4k to 8k','8k to 11k','Greater than 11k')),Calories,type) %>% 
+  ggplot(aes(x=step_cat,y=Calories)) + geom_boxplot(aes(fill = step_cat)) + facet_wrap(~type) +
+  xlab("Number of Steps") +
+  labs(title = "Number of Steps Vs Calories Burned")+
+  scale_fill_brewer(palette= 'Pastel1')
+
+--21.07.2021, 12:02
+Plotting the relationship between users and sleep.
+
+ggplot(only_sleep_clean,aes(x=type,y=TotalMinutesAsleep/60))+geom_boxplot(color='black',fill='tomato',alpha=.4)
+
+Conclusion: Heavy Users sleep less then Light Users. 
+
+--21.07.2021, 12:06
+Categorizing Users on their sleep patterns for more insignt.
+
+only_sleep_clean %>% 
+  group_by(Id) %>% 
+  summarise(Id,type,sleep_type=factor(case_when((TotalMinutesAsleep/60) < 6 ~ 'Inadequate Sleep',
+                                                (TotalMinutesAsleep/60)>=6 & (TotalMinutesAsleep/60) < 8 ~ 'Adequate Sleep',
+                                                (TotalMinutesAsleep/60)>=8 ~ 'Oversleep')),) %>% 
+  summarise(Id,sleep_type,type, .groups = 'drop') %>% 
+  ggplot(aes(sleep_type)) +
+  geom_bar(position = "dodge", aes(fill=type))+
+  theme(legend.position="bottom",text = element_text(size = 20),plot.title = element_text(hjust = 0.5))
+
+Conclusion: Light Users tend to oversleep much more than Heavy Users. Heavy Users seem to sleep just enough or not enough. 
+
+--21.07.2021, 12:16
+Improving the dataviz about sleep patterns. Plotting sleep patterns in percentages for better readability. 
+
+only_sleep_clean %>% 
+  group_by(Id) %>% 
+  summarise(Id,type,sleep_type=factor(case_when((TotalMinutesAsleep/60) < 6 ~ 'Inadequate Sleep',
+                                                (TotalMinutesAsleep/60)>=6 & (TotalMinutesAsleep/60) < 8 ~ 'Adequate Sleep',
+                                                (TotalMinutesAsleep/60)>=8 ~ 'Oversleep')),
+            
+  ) %>% 
+  summarise(Id,sleep_type,type, .groups = 'drop') %>% 
+  ggplot(aes(type)) +
+  geom_bar(position="fill", aes(fill=sleep_type))+
+  scale_y_continuous(labels = scales::percent)+
+  theme(legend.position="right",text = element_text(size = 10),plot.title = element_text(hjust = 0.5))+
+  scale_fill_brewer(palette = 'Pastel1')
+
+Conclusion: Both Heavy & Light Users seem to get equal amount of adequate sleep. Heavy Users tend to get inadequate sleep in contrast to Light Users. Light Users oversleep much more than Heavy Users. 
+
+--21.07.2021, 12:44
+Plotting User Type vs. Hours they sleep on a violin geom. 
+
+only_sleep_clean %>%
+  ggplot(aes(x=type,y=sleep_hrs,fill=type)) + geom_violin(scale='area', alpha=.5) +
+  geom_dotplot(binaxis = 'y', stackdir = 'center', dotsize = .5, color='black') +
+  scale_fill_brewer(palette = 'Pastel1') +
+  ylab("Sleep in Hours") +
+  xlab("Type") +
+  theme(legend.position = 'none') +
+  labs(title = "Type vs. Hours")
+
+Conclusion: We can clearly see and that Light Users get much more sleep hours than Heavy Users. 
+
+--21.07.2021, 12:46
+Plotting the relationship between calories burned and the day. 
+
+--21.07.2021, 13:18
+The plot doesn't display weekdays correctly. Investigating the subject & possible fixes. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
